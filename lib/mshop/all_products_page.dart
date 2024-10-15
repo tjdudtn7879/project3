@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:project3/models/product.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Supabase 패키지 임포트
-import 'package:project3/mshop/ProductDetailPage.dart'; // ProductDetailPage 임포트
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:project3/mshop/ProductDetailPage.dart';
 import 'package:intl/intl.dart';
 import 'package:project3/main.dart';
 import 'package:project3/mshop/ShoppingCart.dart';
+import 'dart:math';
 
 class AllProductsPage extends StatelessWidget {
   const AllProductsPage({super.key});
@@ -13,60 +14,60 @@ class AllProductsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60.0), // AppBar의 높이를 60으로 설정
+        preferredSize: const Size.fromHeight(60.0),
         child: Container(
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Colors.black, width: 2),
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.black, width: 2),
+            ),
+          ),
+          child: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+            title: Center(
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const Main(),
+                    ),
+                  );
+                },
+                child: Image.asset(
+                  'assets/logo.png',
+                  fit: BoxFit.contain,
+                  height: 50,
+                ),
               ),
             ),
-            child: AppBar(
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  Navigator.pop(context); // 뒤로가기 버튼 기능
+            actions: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const Shoppingcart(),
+                    ),
+                  );
                 },
-              ),
-              title: Center(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const Main(), // Main 페이지로 이동
-                      ),
-                    );
-                  },
-                  child: Image.asset(
-                    'assets/logo.png', // 로고 이미지 경로
-                    fit: BoxFit.contain,
-                    height: 50, // 로고 이미지 크기 조정
-                  ),
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 16.0),
+                  child: Icon(Icons.shopping_cart, size: 35),
                 ),
               ),
-              actions: [
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        // Shoppingcart 페이지로 이동
-                        builder: (context) => const Shoppingcart(),
-                      ),
-                    );
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.only(right: 16.0), // 오른쪽에 여백 추가
-                    child: Icon(Icons.shopping_cart, size: 35),
-                  ),
-                ),
-              ],
-              backgroundColor: Colors.white, // AppBar의 배경색을 흰색으로 설정
-              toolbarHeight: 100, // AppBar의 높이 조정
-              centerTitle: true, // 제목을 중앙 정렬
-            )),
+            ],
+            backgroundColor: Colors.white,
+            toolbarHeight: 100,
+            centerTitle: true,
+          ),
+        ),
       ),
-      body: const AllProductListPage(), // AllProductListPage를 메인 콘텐츠로 사용
+      body: const AllProductListPage(),
     );
   }
 }
@@ -78,63 +79,131 @@ class AllProductListPage extends StatefulWidget {
   State<AllProductListPage> createState() => _AllProductListPageState();
 }
 
+//페이징 부분
 class _AllProductListPageState extends State<AllProductListPage> {
   final NumberFormat numberFormat = NumberFormat('###,###,###,###');
+  final int _pageSize = 10; // 페이지당 항목 수
+  int _currentPage = 0; // 현재 페이지 번호
+  List<Product> _productList = [];
+  bool _isLoading = false;
+  int _totalItems = 0; // 전체 아이템 수
 
-  // Supabase에서 모든 상품 데이터를 가져오는 함수
-  Future<List<Product>> fetchAllProducts() async {
-    final List<dynamic> data = await Supabase.instance.client
-        .from('product') // 'product' 테이블에서 데이터 가져오기
-        .select(
-            'product_id, product_title, product_thumbnail, product_image, price'); // 필요한 컬럼 선택
+  @override
+  void initState() {
+    super.initState();
+    _fetchTotalItems(); // 전체 아이템 수 가져오기
+    _fetchProducts(); // 첫 번째 페이지 데이터 가져오기
+  }
 
-    // 데이터가 리스트인 경우 처리
-    return data.map((item) {
-      return Product(
-        productNo: item['product_id'],
-        productName: item['product_title'],
-        price: item['price'].toInt(),
-        productImageUrl: item['product_thumbnail'], // 대표 이미지 URL 사용
-        productDetails: item['product_image'], // 상세 이미지 URL 사용
-      );
-    }).toList();
+  // Supabase에서 전체 아이템 수를 가져오는 함수
+  Future<void> _fetchTotalItems() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('product')
+          .select('product_id') // 전체 데이터를 가져옵니다.
+          .then((data) => data as List<dynamic>); // 응답을 List로 변환
+
+      setState(() {
+        _totalItems = response.length; // 리스트의 길이로 전체 아이템 수를 설정
+      });
+    } catch (e) {
+      print('Exception: $e');
+    }
+  }
+
+  // Supabase에서 상품 데이터를 가져오는 함수
+  Future<void> _fetchProducts() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await Supabase.instance.client
+          .from('product')
+          .select(
+              'product_id, product_title, product_thumbnail, product_image, price')
+          .order('product_id', ascending: false)
+          .range(_currentPage * _pageSize, (_currentPage + 1) * _pageSize - 1)
+          .then((data) {
+        return data as List<dynamic>;
+      });
+
+      if (response.isNotEmpty) {
+        final products = response.map<Product>((item) {
+          return Product(
+            productNo: item['product_id'],
+            productName: item['product_title'],
+            price: item['price'].toInt(),
+            productImageUrl: item['product_thumbnail'],
+            productDetails: item['product_image'],
+          );
+        }).toList();
+
+        setState(() {
+          _productList = products;
+        });
+      } else {
+        // 데이터가 없을 경우 처리
+        print('No products found');
+      }
+    } catch (e) {
+      // 예외 처리
+      print('Exception: $e');
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  // 페이지를 변경하는 함수
+  void _changePage(int pageIndex) {
+    if (pageIndex < 0 ||
+        _isLoading ||
+        pageIndex >= (_totalItems / _pageSize).ceil()) {
+      return;
+    }
+
+    setState(() {
+      _currentPage = pageIndex;
+      _productList.clear(); // 이전 데이터 초기화
+    });
+
+    _fetchProducts();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Product>>(
-      future: fetchAllProducts(), // Supabase에서 모든 데이터를 가져옴
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator()); // 로딩 인디케이터
-        } else if (snapshot.hasError) {
-          return Center(child: Text('오류 발생: ${snapshot.error}'));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('데이터가 없습니다.'));
-        } else {
-          final productList = snapshot.data!;
-          return GridView.builder(
-            padding: const EdgeInsets.all(8.0), // 패딩 추가
+    return Column(
+      children: [
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(8.0),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, // 한 행에 2개의 아이템을 보여줌
-              crossAxisSpacing: 8.0, // 좌우 간격
-              mainAxisSpacing: 8.0, // 상하 간격
-              childAspectRatio: 0.75, // 아이템의 비율을 조정하여 이미지가 조금 더 길어짐
+              crossAxisCount: 2,
+              crossAxisSpacing: 8.0,
+              mainAxisSpacing: 8.0,
+              childAspectRatio: 0.75,
             ),
-            itemCount: productList.length,
+            itemCount: _productList.length,
             itemBuilder: (context, index) {
-              return _buildGridItem(productList[index]);
+              return _buildGridItem(_productList[index]);
             },
-          );
-        }
-      },
+          ),
+        ),
+        if (_totalItems > 0) // 전체 아이템 수가 0보다 클 경우에만 표시
+          _buildPaginationControls(),
+        if (_isLoading) // 로딩 중일 때만 표시
+          const Center(
+            child: CircularProgressIndicator(),
+          ),
+      ],
     );
   }
 
   Widget _buildGridItem(Product product) {
     return InkWell(
       onTap: () {
-        // 클릭 시 상세 페이지로 이동
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -143,27 +212,27 @@ class _AllProductListPageState extends State<AllProductListPage> {
         );
       },
       child: Card(
-        elevation: 4.0, // 카드 그림자 추가
+        elevation: 4.0,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               child: Image.network(
                 product.productImageUrl ??
-                    'https://example.com/placeholder.jpg', // null일 경우 대체 이미지 URL 제공
-                fit: BoxFit.cover, // 이미지가 꽉 차게 표시
-                height: 200, // 이미지 높이 설정
+                    'https://example.com/placeholder.jpg',
+                fit: BoxFit.cover,
+                height: 200,
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(12.0), // 상단 여백을 12.0으로 확대
+              padding: const EdgeInsets.all(12.0),
               child: Text(
-                product.productName ?? '상품명 없음', // null일 경우 기본값 제공
-                maxLines: 1, // 한 줄로 제한
-                overflow: TextOverflow.ellipsis, // 글자가 넘으면 ... 처리
-                textAlign: TextAlign.center, // 텍스트 중앙 정렬
+                product.productName ?? '상품명 없음',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 18.0, // 폰트 크기를 18로 키움
+                  fontSize: 18.0,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -171,17 +240,86 @@ class _AllProductListPageState extends State<AllProductListPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0),
               child: Text(
-                '${numberFormat.format(product.price)}원', // 가격 표시
-                textAlign: TextAlign.center, // 가격도 중앙 정렬
+                '${numberFormat.format(product.price)}원',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16.0, // 가격 폰트 크기를 16으로 키움
+                  fontSize: 16.0,
                   color: Colors.grey[700],
                 ),
               ),
             ),
-            const SizedBox(height: 10), // 가격과 하단 간격 추가
+            const SizedBox(height: 10),
           ],
         ),
+      ),
+    );
+  }
+
+  // 페이지네이션 컨트롤 위젯
+  Widget _buildPaginationControls() {
+    const int pageRange = 2; // 현재 페이지를 기준으로 표시할 페이지 범위
+    final int totalPages = (_totalItems / _pageSize).ceil(); // 전체 페이지 수 계산
+    final int startPage = max(0, _currentPage - pageRange); // 시작 페이지 (최소 0)
+    final int endPage = min(
+        totalPages - 1, _currentPage + pageRange); // 끝 페이지 (최대 totalPages - 1)
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0), // 추가 여백
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (_currentPage > 0)
+            InkWell(
+              onTap: () => _changePage(0),
+              child: Container(
+                margin: const EdgeInsets.all(4.0),
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Color(0xFFFFAD8F),
+                  border: Border.all(color: Colors.black), // 검정색 테두리 추가
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: const Text(
+                  '<<',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          for (int i = startPage; i <= endPage; i++)
+            InkWell(
+              onTap: () => _changePage(i),
+              child: Container(
+                margin: const EdgeInsets.all(4.0),
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: i == _currentPage ? Color(0xFFFFAD8F) : Colors.white,
+                  border: Border.all(color: Colors.black), // 검정색 테두리 추가
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: Text(
+                  '${i + 1}', // 페이지 번호는 1부터 시작
+                  style: const TextStyle(color: Colors.black),
+                ),
+              ),
+            ),
+          if (_currentPage < totalPages - 1)
+            InkWell(
+              onTap: () => _changePage(totalPages - 1),
+              child: Container(
+                margin: const EdgeInsets.all(4.0),
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Color(0xFFFFAD8F),
+                  border: Border.all(color: Colors.black), // 검정색 테두리 추가s
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: const Text(
+                  '>>',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

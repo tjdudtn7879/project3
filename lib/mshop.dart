@@ -43,7 +43,6 @@ class Mshop extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  // Shoppingcart 페이지로 이동
                   builder: (context) => const Shoppingcart(),
                 ),
               );
@@ -60,12 +59,9 @@ class Mshop extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // '전체상품' 아이콘 추가 (화면 전체 가로 크기)
-          Container(
-            width: MediaQuery.of(context).size.width, // 화면 전체 너비
-            height:
-                MediaQuery.of(context).size.height / 4, // 기존 Expanded와 동일한 높이
-            color: const Color(0xFFFFAD8F), // 코랄색 배경
+          // '전체상품' 박스
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0), // 좌우 간격 추가
             child: GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -76,54 +72,43 @@ class Mshop extends StatelessWidget {
                   ),
                 );
               },
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.all_inclusive,
-                      size: 50, color: Colors.white), // 전체상품 아이콘
-                  SizedBox(height: 10),
-                  Text(
+              child: Container(
+                width: MediaQuery.of(context).size.width, // 화면 전체 너비
+                height: MediaQuery.of(context).size.height / 4, // 상단 큰 박스 높이
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFAD8F), // 코랄색 배경
+                  borderRadius: BorderRadius.circular(16), // 모서리 둥글게
+                ),
+                child: Center(
+                  child: const Text(
                     '전체상품',
-                    style: TextStyle(color: Colors.white, fontSize: 18),
+                    style: TextStyle(color: Colors.black, fontSize: 24),
                   ),
-                ],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 10), // '전체상품'과 2x2 그리드 사이의 간격
-          // 첫 번째 행 (2x2 그리드)
+          const SizedBox(height: 10), // '전체상품'과 그리드 사이의 간격
+
+          // 2x2 그리드
           Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(
-                  child: _buildGridItem(
-                      Icons.food_bank, '식품', context, const FoodPage()),
-                ),
-                const SizedBox(width: 10), // 열 사이의 간격
-                Expanded(
-                  child: _buildGridItem(
-                      Icons.house, '생활용품', context, const LivingSuppliesPage()),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10), // 행 사이의 간격
-          // 두 번째 행 (2x2 그리드)
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(
-                  child: _buildGridItem(
-                      Icons.dry_cleaning, '의류', context, const ClothingPage()),
-                ),
-                const SizedBox(width: 10), // 열 사이의 간격
-                Expanded(
-                  child: _buildGridItem(
-                      Icons.card_giftcard, '선물용', context, const GiftPage()),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(8.0), // 그리드 패딩 추가
+              child: GridView.count(
+                crossAxisCount: 2, // 2열로 설정
+                crossAxisSpacing: 10, // 열 간격
+                mainAxisSpacing: 10, // 행 간격
+                children: [
+                  _buildGridItem(
+                      '식품', Color(0xFF7CD3EA), const FoodPage(), context),
+                  _buildGridItem('생활용품', Color(0xFFA2EEBD),
+                      const LivingSuppliesPage(), context),
+                  _buildGridItem(
+                      '의류', Color(0xFFF6F7C5), const ClothingPage(), context),
+                  _buildGridItem(
+                      '선물용', Color(0xFFF6D6D5), const GiftPage(), context),
+                ],
+              ),
             ),
           ),
         ],
@@ -133,7 +118,7 @@ class Mshop extends StatelessWidget {
 
   // 아이템 그리드 생성 함수 (2x2 그리드용)
   Widget _buildGridItem(
-      IconData icon, String label, BuildContext context, Widget page) {
+      String label, Color color, Widget page, BuildContext context) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -144,19 +129,15 @@ class Mshop extends StatelessWidget {
         );
       },
       child: Container(
-        width: MediaQuery.of(context).size.width / 2 - 16, // 2열을 고려한 너비 조정
-        height: MediaQuery.of(context).size.height / 4 - 16, // 높이 설정
-        color: const Color(0xFFFFAD8F), // 코랄색 배경
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 50, color: Colors.white),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white, fontSize: 18),
-            ),
-          ],
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16), // 모서리 둥글게
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.black, fontSize: 22),
+          ),
         ),
       ),
     );
